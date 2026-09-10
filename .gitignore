@@ -1,0 +1,35 @@
+# Data and generated artifacts
+/downloads/
+/raw/
+/prepared/
+/checkpoints/
+/results/
+/outputs/
+/logs/
+/previews/
+/*_preview.png
+
+# Third-party source and Python environments
+/repos/
+/.venv/
+/venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+.coverage
+htmlcov/
+
+# Local credentials and editor state
+.env
+.env.*
+kaggle.json
+.kaggle/
+*.pem
+*.key
+.DS_Store
+.idea/
+.vscode/
+*.part

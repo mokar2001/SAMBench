@@ -1,0 +1,13 @@
+{
+  "sam1_vit_b": {"family":"sam1","architecture":"vit_b","checkpoint":"sam_vit_b_01ec64.pth","url":"https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"},
+  "sam1_vit_l": {"family":"sam1","architecture":"vit_l","checkpoint":"sam_vit_l_0b3195.pth","url":"https://dl.fbaipublicfiles.com/segment_anything/sam_vit_l_0b3195.pth"},
+  "sam1_vit_h": {"family":"sam1","architecture":"vit_h","checkpoint":"sam_vit_h_4b8939.pth","url":"https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth"},
+  "sam2_tiny": {"family":"sam2","config":"configs/sam2/sam2_hiera_t.yaml","checkpoint":"sam2_hiera_tiny.pt","url":"https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_tiny.pt"},
+  "sam2_small": {"family":"sam2","config":"configs/sam2/sam2_hiera_s.yaml","checkpoint":"sam2_hiera_small.pt","url":"https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_small.pt"},
+  "sam2_base_plus": {"family":"sam2","config":"configs/sam2/sam2_hiera_b+.yaml","checkpoint":"sam2_hiera_base_plus.pt","url":"https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_base_plus.pt"},
+  "sam2_large": {"family":"sam2","config":"configs/sam2/sam2_hiera_l.yaml","checkpoint":"sam2_hiera_large.pt","url":"https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_large.pt"},
+  "sam21_tiny": {"family":"sam2","config":"configs/sam2.1/sam2.1_hiera_t.yaml","checkpoint":"sam2.1_hiera_tiny.pt","url":"https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_tiny.pt"},
+  "sam21_small": {"family":"sam2","config":"configs/sam2.1/sam2.1_hiera_s.yaml","checkpoint":"sam2.1_hiera_small.pt","url":"https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_small.pt"},
+  "sam21_base_plus": {"family":"sam2","config":"configs/sam2.1/sam2.1_hiera_b+.yaml","checkpoint":"sam2.1_hiera_base_plus.pt","url":"https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_base_plus.pt"},
+  "sam21_large": {"family":"sam2","config":"configs/sam2.1/sam2.1_hiera_l.yaml","checkpoint":"sam2.1_hiera_large.pt","url":"https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_large.pt"}
+}
