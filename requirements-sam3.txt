@@ -1,0 +1,4 @@
+# Optional SAM 3 visual segmentation backend; keep the existing torch/numpy build.
+transformers==5.17.0
+huggingface_hub==1.30.0
+safetensors==0.8.0

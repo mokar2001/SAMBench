@@ -153,6 +153,11 @@ def _report(output,plan):
                              f'{r["gt_macro_iou"]:.4f} | {r["gt_macro_boundary_f1"]:.4f} | {r["seconds_per_image_mean"]:.2f} |')
         lines+=['']
     done=all(row['status']=='complete' for row in coverage)
+    if 'sam3' in plan['models']:
+        lines+=['SAM 3 uses the visual instance-segmentation (PVS/tracker) head through the pinned '
+                'Hugging Face Transformers backend. It receives no text or concept prompts. Automatic SAM 3 masks '
+                'use the same SAM 2 point-grid/crop/filter/NMS implementation with the SAM 3 predictor; all mask '
+                'logits and quality scores come from SAM 3. Backend versions and checkpoint/config hashes are saved.','']
     lines+=['## Interpretation','',
             'The two modes are separate tasks and have separate rankings. Bbox mode receives privileged ground-truth location information. '
             'Automatic mode generates general object proposals: every returned proposal is treated as a tooth prediction; extra structures and duplicate masks count as false positives. '

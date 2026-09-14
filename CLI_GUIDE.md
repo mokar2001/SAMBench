@@ -51,9 +51,9 @@ nice -n 10 .venv/bin/python benchmark.py run \
   --output results/tiny_large_huge_10 \
   --background
 
-# All 11 downloaded checkpoints, on a development subset
+# All 11 ungated checkpoints, on a development subset
 .venv/bin/python benchmark.py run \
-  --mode both --models all --split dev --samples 5 \
+  --mode both --models ungated --split dev --samples 5 \
   --output results/all_models_dev5 --background
 ```
 
@@ -62,10 +62,60 @@ nice -n 10 .venv/bin/python benchmark.py run \
 | `sam1` | `base`, `large`, `huge` | `sam1_vit_b`, `sam1_vit_l`, `sam1_vit_h` |
 | `sam2` | `tiny`, `small`, `base_plus`, `large` | `sam2_tiny`, `sam2_small`, `sam2_base_plus`, `sam2_large` |
 | `sam2.1` | `tiny`, `small`, `base_plus`, `large` | `sam21_tiny`, `sam21_small`, `sam21_base_plus`, `sam21_large` |
+| `sam3` | `default` (or omit `--size`) | `sam3` |
 
 Use either `--family ... --size ...` for one model or `--models ...` for explicit
 selections. “Huge” means SAM 1 ViT-H; SAM 2/2.1 have no huge checkpoint. Mixed
 generation/size comparisons are permitted, but every entry retains its full ID.
+
+## SAM 3
+
+The `sam3` entry evaluates the **visual instance-segmentation (PVS/tracker) head**
+of Meta's `facebook/sam3` checkpoint using `transformers==5.17.0`. It supports CPU
+FP32 and CUDA. This is the [SAM 3 interface for boxes and points](https://huggingface.co/docs/transformers/v5.17.0/en/model_doc/sam3_tracker),
+which corresponds to the existing SAM 1/2 task. No text, concept exemplar, or
+ground-truth mask is supplied. SAM 3 has one entry; Tiny/Large/Huge are not SAM 3 variants.
+
+```bash
+.venv/bin/python -m pip install -r requirements-sam3.txt
+.venv/bin/python -c "from huggingface_hub import login; login(add_to_git_credential=False)"
+.venv/bin/python download_checkpoints.py --models sam3
+
+nice -n 10 .venv/bin/python benchmark.py run \
+  --mode both --models sam3 --samples 50 --device cpu --threads 2 \
+  --output results/sam3_both_50 --background
+
+# All 12 entries, including SAM 3; all must have their checkpoints installed
+nice -n 10 .venv/bin/python benchmark.py run \
+  --mode both --models all --samples 50 --device cpu --threads 2 \
+  --output results/all12_both_50 --background
+```
+
+Use a read token from an account with approved access to `facebook/sam3`. Enter it
+only at the hidden login prompt. The downloader uses Hugging Face's cached login;
+tokens are never saved in benchmark plans, checkpoint metadata, or Git.
+
+The Hub revision is pinned in `models.json`. The downloaded weights, model config,
+and processor config each have SHA256 provenance; inference loads them locally.
+Every required tracker weight must load successfully. Image embeddings are cached
+once per image/crop. Box mode returns one mask with dynamic multi-mask fallback,
+hole filling, and sprinkle removal disabled, using logit threshold zero.
+
+For automatic mode, the existing pinned **SAM 2 automatic mask generator** supplies
+the grid, crop schedule, stability/quality filters, and NMS. Its predictor is replaced
+with the SAM 3 adapter: every mask logit and quality score comes from SAM 3. This
+keeps proposal processing common across SAM 2/2.1/3, with each model's native image
+size and preprocessing. Reports identify the different backend; timings include the
+adapter and native Hugging Face calls. This does not evaluate SAM 3 concept/text segmentation.
+
+`--models ungated` selects only SAM 1/2/2.1 and needs no Hugging Face login.
+`--models all` selects all 12 entries and requires SAM 3 setup. The downloader defaults
+to `ungated`. Optional adapter tests use synthetic outputs and need no gated weights:
+`.venv/bin/python -m pytest -q test_sam3.py`.
+
+Upgrading changes source hashes. Keep the previous checkout/environment to resume
+old experiments, or restore their exact source snapshots; use a new output directory
+for new code. Do not combine an old run and a new SAM 3 run into one leaderboard.
 
 ## Inspect, resume and export
 

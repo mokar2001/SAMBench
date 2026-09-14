@@ -33,3 +33,4 @@ kaggle.json
 .idea/
 .vscode/
 *.part
+*.log

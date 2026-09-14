@@ -54,6 +54,7 @@ def run_job(output, model_name, mode):
     plan=read(output/'plan.json')
     verify_plan(plan)
     root=Path(plan['root'])
+    spec=read(root/'models.json')[model_name]
     job=output/mode/model_name
     job.mkdir(parents=True,exist_ok=True)
     torch.set_num_threads(plan['threads'])
@@ -73,6 +74,11 @@ def run_job(output, model_name, mode):
              'device_name':torch.cuda.get_device_name() if device=='cuda' else next(
                  (s.split(':',1)[1].strip() for s in Path('/proc/cpuinfo').read_text().splitlines()
                   if s.startswith('model name')),platform.machine()) if Path('/proc/cpuinfo').exists() else platform.machine()}
+    if spec['family']=='sam3':
+        try:
+            runtime['packages'].update({name:version(name) for name in ['transformers','huggingface_hub','safetensors']})
+        except Exception as exc:
+            raise ValueError('Install SAM 3 dependencies using requirements-sam3.txt.') from exc
     if (job/'runtime.json').exists() and read(job/'runtime.json')!=runtime:
         raise ValueError('Runtime/hardware changed; use a new output directory.')
     write(job/'runtime.json',runtime)
@@ -82,10 +88,12 @@ def run_job(output, model_name, mode):
         print(f'{model_name} {mode}: all {len(images)} images already complete; skipped.',flush=True)
         return
     write(job/'status.json',{'state':'loading','completed_images':len(images)-len(pending),'expected_images':len(images)})
-    spec=read(root/'models.json')[model_name]
+    expected_files=dict(plan.get('checkpoint_files_sha256',{})) if spec['family']=='sam3' else {}
+    expected_files[spec['checkpoint']]=plan['checkpoints_sha256'][model_name]
+    for filename,expected_hash in expected_files.items():
+        if digest(root/'checkpoints'/filename)!=expected_hash:
+            raise ValueError(f'Checkpoint/config SHA256 mismatch: {filename}')
     checkpoint=root/'checkpoints'/spec['checkpoint']
-    if digest(checkpoint)!=plan['checkpoints_sha256'][model_name]:
-        raise ValueError(f'Checkpoint SHA256 mismatch: {checkpoint}')
     def sync():
         if device=='cuda':
             torch.cuda.synchronize()
@@ -93,10 +101,18 @@ def run_job(output, model_name, mode):
         torch.cuda.reset_peak_memory_stats()
     with torch.inference_mode():
         start=time.perf_counter()
-        predictor=create_predictor(spec,checkpoint,device)
+        if spec['family']=='sam3':
+            from .sam3 import Sam3Predictor,automatic_generator as sam3_generator
+            predictor=Sam3Predictor(checkpoint,device,spec['transformers_version'])
+        else:
+            predictor=create_predictor(spec,checkpoint,device)
+        # Some upstream imports change TF32 globally; enforce the recorded FP32 protocol.
+        torch.backends.cuda.matmul.allow_tf32=False
+        torch.backends.cudnn.allow_tf32=False
         sync()
         load_seconds=time.perf_counter()-start
-        generator=automatic_generator(predictor.model,spec['family'],plan['auto']) if mode=='auto' else None
+        generator=(sam3_generator(predictor,plan['auto']) if spec['family']=='sam3' else
+                   automatic_generator(predictor.model,spec['family'],plan['auto'])) if mode=='auto' else None
         write(job/'status.json',{'state':'warmup','completed_images':len(images)-len(pending),'expected_images':len(images)})
         print(f'{model_name} {mode}: model loaded in {load_seconds:.1f}s; warming up.',flush=True)
         warm_im=pending[0]
@@ -111,7 +127,9 @@ def run_job(output, model_name, mode):
                               point_labels=np.array([1]),multimask_output=True)
         sync()
         write(job/'model_info.json',{'parameters':sum(p.numel() for p in predictor.model.parameters()),
-                                     'load_seconds':load_seconds,'warmup':'one full image and one prompt; auto uses image center'})
+                                     'load_seconds':load_seconds,'warmup':'one full image and one prompt; auto uses image center',
+                                     'backend':spec.get('backend','official_meta'),
+                                     'auto_generator':'sam2_amg_with_sam3_predictor' if spec['family']=='sam3' else 'official_meta'})
         failed=[]
         for number,im in enumerate(images,1):
             destination=job/f'images/{im["id"]:04d}.json'

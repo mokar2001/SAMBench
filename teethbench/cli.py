@@ -47,9 +47,9 @@ def parser():
     run.add_argument('--root',type=Path,default=ROOT)
     run.add_argument('--mode',choices=['auto','bbox','both'],required=True,help='auto: no GT prompts; bbox: one GT box per tooth; both: two separate leaderboards')
     selection=run.add_mutually_exclusive_group(required=True)
-    selection.add_argument('--models',nargs='+',metavar='ID',help='Explicit model IDs, or all; see models command')
+    selection.add_argument('--models',nargs='+',metavar='ID',help='Explicit IDs, all (including gated SAM 3), or ungated (SAM 1/2/2.1)')
     selection.add_argument('--family',choices=list(FAMILIES),help='Select one family, together with --size')
-    run.add_argument('--size',choices=['tiny','small','base','base_plus','large','huge'],help='Model size; available sizes depend on family')
+    run.add_argument('--size',choices=['tiny','small','base','base_plus','large','huge','default'],help='Model size; optional for SAM 3, which has one checkpoint')
     run.add_argument('--samples','--limit',type=nonnegative,default=0,help='Exact number of sampled images, not teeth; 0 uses the full selected split')
     run.add_argument('--seed',type=nonnegative,default=20260909,help='Deterministic image sampling and box jitter seed')
     run.add_argument('--split',choices=['dev','test','all'],default='test')
@@ -134,7 +134,7 @@ def prepare_output(output,plan):
             raise ValueError('Output directory is not empty and has no v2 plan. Choose a new directory.')
         root=Path(plan['root'])
         snapshot=output/'source_snapshot'
-        for name in list(plan['source_sha256'])+['requirements.lock.txt','source_revisions.json']:
+        for name in list(plan['source_sha256'])+['requirements.lock.txt','requirements-sam3.txt','source_revisions.json']:
             src=root/name
             if src.exists():
                 dest=snapshot/name
@@ -252,6 +252,14 @@ def main(argv=None):
             output=(args.output or args.root/'results'/f'cli_{datetime.now(timezone.utc):%Y%m%d_%H%M%S_%f}').resolve()
             show_plan(plan,output)
             if not args.dry_run:
+                if 'sam3' in plan['models']:
+                    from importlib.metadata import version,PackageNotFoundError
+                    try:
+                        installed=version('transformers')
+                    except PackageNotFoundError:
+                        installed=None
+                    if installed!=plan['model_specs']['sam3']['transformers_version']:
+                        raise ValueError('Install SAM 3 dependencies: .venv/bin/python -m pip install -r requirements-sam3.txt')
                 if args.device=='cuda':
                     import torch
                     if not torch.cuda.is_available():

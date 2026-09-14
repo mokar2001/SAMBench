@@ -9,5 +9,6 @@
   "sam21_tiny": {"family":"sam2","config":"configs/sam2.1/sam2.1_hiera_t.yaml","checkpoint":"sam2.1_hiera_tiny.pt","url":"https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_tiny.pt"},
   "sam21_small": {"family":"sam2","config":"configs/sam2.1/sam2.1_hiera_s.yaml","checkpoint":"sam2.1_hiera_small.pt","url":"https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_small.pt"},
   "sam21_base_plus": {"family":"sam2","config":"configs/sam2.1/sam2.1_hiera_b+.yaml","checkpoint":"sam2.1_hiera_base_plus.pt","url":"https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_base_plus.pt"},
-  "sam21_large": {"family":"sam2","config":"configs/sam2.1/sam2.1_hiera_l.yaml","checkpoint":"sam2.1_hiera_large.pt","url":"https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_large.pt"}
+  "sam21_large": {"family":"sam2","config":"configs/sam2.1/sam2.1_hiera_l.yaml","checkpoint":"sam2.1_hiera_large.pt","url":"https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_large.pt"},
+  "sam3": {"family":"sam3","checkpoint":"sam3/model.safetensors","hf_repo":"facebook/sam3","hf_revision":"3c879f39826c281e95690f02c7821c4de09afae7","hf_files":["config.json","processor_config.json","model.safetensors"],"backend":"transformers.Sam3TrackerModel","transformers_version":"5.17.0"}
 }

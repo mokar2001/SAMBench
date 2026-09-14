@@ -9,6 +9,7 @@ FAMILIES = {
     'sam1': {'base':'sam1_vit_b','large':'sam1_vit_l','huge':'sam1_vit_h'},
     'sam2': {s:'sam2_'+s for s in ['tiny','small','base_plus','large']},
     'sam2.1': {s:'sam21_'+s for s in ['tiny','small','base_plus','large']},
+    'sam3': {'default':'sam3'},
 }
 
 
@@ -33,8 +34,15 @@ def select_models(registry, models=None, family=None, size=None):
     if models:
         if family or size:
             raise ValueError('Use either --models or --family with --size, not both.')
-        selected=list(registry) if models==['all'] else models
+        if models==['all']:
+            selected=list(registry)
+        elif models==['ungated']:
+            selected=[n for n,s in registry.items() if not s.get('hf_repo')]
+        else:
+            selected=models
     else:
+        if family=='sam3' and size is None:
+            size='default'
         if not family or not size:
             raise ValueError('Specify --models ID [ID ...], or both --family and --size. See the models command.')
         if size not in FAMILIES[family]:
@@ -97,12 +105,24 @@ def build_plan(args):
         raise ValueError('--box-condition applies only to bbox or both mode.')
     images=sample_images(read(root/'prepared/manifest.json')['images'],args.split,args.samples,args.seed)
     checkpoints={}
+    checkpoint_files={}
     for name in models:
         path=root/'checkpoints'/registry[name]['checkpoint']
         record=root/'checkpoints'/f'{name}.json'
         if not path.is_file() or not record.is_file():
             raise ValueError(f'Missing checkpoint for {name}. Run: .venv/bin/python download_checkpoints.py --models {name}')
-        checkpoints[name]=read(record)['sha256']
+        metadata=read(record)
+        checkpoints[name]=metadata['sha256']
+        if registry[name].get('hf_repo'):
+            if metadata.get('hf_revision')!=registry[name]['hf_revision']:
+                raise ValueError(f'Checkpoint revision changed for {name}; run download_checkpoints.py --models {name}.')
+            expected={str(Path(registry[name]['checkpoint']).parent / f) for f in registry[name]['hf_files']}
+            files=metadata.get('files_sha256',{})
+            if set(files)!=expected:
+                raise ValueError(f'Incomplete checkpoint metadata for {name}; run download_checkpoints.py --models {name}.')
+            if files[registry[name]['checkpoint']]!=metadata['sha256']:
+                raise ValueError(f'Inconsistent checkpoint hashes for {name}; run download_checkpoints.py --models {name}.')
+            checkpoint_files.update(files)
     return {'schema':SCHEMA,'root':str(root),'models':models,
             'modes':['auto','bbox'] if args.mode=='both' else [args.mode],
             'split':args.split,'requested_samples':args.samples,'seed':args.seed,
@@ -119,7 +139,8 @@ def build_plan(args):
                     'crop_overlap_ratio':512/1500,'crop_n_points_downscale_factor':1,
                     'min_mask_region_area':0,'output_mode':'coco_rle'},
             'manifest_sha256':digest(root/'prepared/manifest.json'),
-            'checkpoints_sha256':checkpoints,'source_sha256':source_hashes(root),
+            'checkpoints_sha256':checkpoints,'checkpoint_files_sha256':checkpoint_files,
+            'model_specs':{name:registry[name] for name in models},'source_sha256':source_hashes(root),
             'repositories':repository_state(root)}
 
 
