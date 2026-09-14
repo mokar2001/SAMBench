@@ -1,8 +1,8 @@
 # Data and generated artifacts
 /downloads/
-/raw/
-/prepared/
-/checkpoints/
+/raw
+/prepared
+/checkpoints
 /results/
 /outputs/
 /logs/
