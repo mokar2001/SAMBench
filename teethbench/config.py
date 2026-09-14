@@ -125,6 +125,9 @@ def build_plan(args):
             checkpoint_files.update(files)
     return {'schema':SCHEMA,'root':str(root),'models':models,
             'modes':['auto','bbox'] if args.mode=='both' else [args.mode],
+            'execution':{'schedule':'model_then_image','mode_order':['bbox','auto'] if args.mode=='both' else [args.mode],
+                         'embedding_cache':'one image/crop; shared between modes',
+                         'timing':'per-mode encoding inclusive; actual inference recorded separately'},
             'split':args.split,'requested_samples':args.samples,'seed':args.seed,
             'images':images,'image_count':len(images),
             'image_group_count':len({im['pixel_sha256'] for im in images}),

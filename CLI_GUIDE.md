@@ -37,6 +37,32 @@ Auto mode has no tooth classifier and generates general object proposals. Propos
 for bone, background structures, and duplicate teeth all count as false positives.
 Ground truth is never used to filter, select top-k, or refine automatic predictions.
 
+## Embedding reuse and timing
+
+All families cache image features for every box and automatic point batch. In
+`--mode both`, one worker loads a model once, then processes each image's bbox
+evaluation followed by automatic evaluation using the same full-image embedding.
+Only image features are shared; automatic prompts remain independent of GT.
+With default `--crop-layers 0`, an image with 30 teeth needs **one encoding across
+both modes**, plus the box decodes and point-grid decodes. Each additional crop
+needs its own encoding; one extra layer adds four crop encodings. Features are
+released between images and after failures, so memory does not grow with the cohort.
+Warmup separately encodes one image per worker and is excluded from measurements.
+
+Per-image JSON and CSV record `encoder_calls`, `embedding_reuses`,
+`encode_seconds`, and `shared_encode_seconds`. `inference_seconds` includes
+the encoding cost in each mode so a mode does not appear faster merely because
+the other mode ran first. `actual_inference_seconds` measures the work actually
+performed; sum it across modes for inference time without double counting shared
+encoding. It excludes warmup, model loading, metrics, input reads and file writes.
+Model load time and peak memory are shared worker measurements. Automatic timing
+still includes native grid/crop decoding, filtering/NMS and RLE conversion.
+
+Results are saved separately after each image/mode. On resume, completed modes
+are skipped, and an image is encoded again only if a missing mode needs it; no
+embeddings are persisted to disk. Use a new output directory after this code upgrade.
+No additional optimization flag is required.
+
 ## Choose models and sizes
 
 ```bash

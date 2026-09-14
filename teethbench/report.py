@@ -93,6 +93,9 @@ def _report(output,plan):
                  'seconds_per_image_mean':float(np.mean([r['inference_seconds'] for r in results])),
                  'seconds_per_image_median':float(np.median([r['inference_seconds'] for r in results])),
                  'seconds_per_image_p95':float(np.percentile([r['inference_seconds'] for r in results],95)),
+                 'actual_seconds_per_image_mean':float(np.mean([r.get('actual_inference_seconds',r['inference_seconds']) for r in results])),
+                 'encoder_calls':sum(r.get('encoder_calls',0) for r in results) if all('encoder_calls' in r for r in results) else None,
+                 'embedding_reuses':sum(r.get('embedding_reuses',0) for r in results) if all('embedding_reuses' in r for r in results) else None,
                  'parameters':info.get('parameters'),'peak_process_rss_gib':state.get('peak_process_rss_gib'),
                  'peak_cuda_allocated_gib':state.get('peak_cuda_allocated_gib')}
             if mode=='auto':
@@ -109,7 +112,9 @@ def _report(output,plan):
             rows.append(row)
             for result in results:
                 image_rows.append({'model':model,'mode':mode,'image_id':result['image_id'],
-                                   'inference_seconds':result['inference_seconds'],**result['summary']})
+                                   'inference_seconds':result['inference_seconds'],
+                                   **{k:result[k] for k in ['actual_inference_seconds','encode_seconds','shared_encode_seconds',
+                                                           'encoder_calls','embedding_reuses'] if k in result},**result['summary']})
                 for gt in result['gt_scores']:
                     tooth_rows.append({'model':model,'mode':mode,'image_id':result['image_id'],**gt})
         rows.sort(key=lambda row:(-row['primary_score'],row['model']))
@@ -153,6 +158,13 @@ def _report(output,plan):
                              f'{r["gt_macro_iou"]:.4f} | {r["gt_macro_boundary_f1"]:.4f} | {r["seconds_per_image_mean"]:.2f} |')
         lines+=['']
     done=all(row['status']=='complete' for row in coverage)
+    if plan.get('execution'):
+        lines+=['Each model is loaded once per worker. In both mode, bbox prompts and then automatic prompts share the '
+                'same full-image embedding; additional automatic crops are each encoded once. Only image features are shared. '
+                'Warmup is separate. Encoder counts and reuse counts are saved per image and exclude warmup. '
+                'Seconds/image includes the full-image encoding cost in each mode for comparison with standalone runs; '
+                'actual_inference_seconds records time actually spent, without charging shared encoding twice. '
+                'Model load and peak memory are shared worker measurements, not additive per-mode costs.','']
     if 'sam3' in plan['models']:
         lines+=['SAM 3 uses the visual instance-segmentation (PVS/tracker) head through the pinned '
                 'Hugging Face Transformers backend. It receives no text or concept prompts. Automatic SAM 3 masks '

@@ -1,5 +1,6 @@
 """User-facing commands; model imports happen only in worker processes."""
 import argparse
+from contextlib import ExitStack
 from datetime import datetime,timezone
 import fcntl
 import os
@@ -116,6 +117,7 @@ def show_plan(plan,output):
     print('Modes: '+', '.join(plan['modes']))
     print(f'Cohort: {plan["image_count"]} images, {plan["image_group_count"]} groups, {plan["tooth_count"]} teeth ({plan["split"]}, seed {plan["seed"]})')
     print(f'Compute: {plan["device"]}, float32, {plan["threads"]} CPU threads, sequential jobs')
+    print('Embeddings: one per image/crop; both modes share one model load and full-image embedding')
     if 'auto' in plan['modes']:
         print(f'Automatic grid: {plan["auto"]["points_per_side"]} x {plan["auto"]["points_per_side"]}; matching IoU >= {plan["matching_iou"]}')
     print('Output: '+str(output))
@@ -143,6 +145,16 @@ def prepare_output(output,plan):
         write(output/'plan.json',plan)
 
 
+def worker_schedule(plan):
+    """Keep one model loaded and finish both tasks while each image is cached."""
+    for model in plan['models']:
+        if set(plan['modes'])=={'auto','bbox'}:
+            yield model,'both',['bbox','auto']
+        else:
+            for mode in plan['modes']:
+                yield model,mode,[mode]
+
+
 def execute(output,lock_fd=None):
     from .report import report
     plan=read(output/'plan.json')
@@ -158,31 +170,36 @@ def execute(output,lock_fd=None):
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM,interrupt)
     try:
-        for mode in plan['modes']:
-            for model in plan['models']:
-                verify_plan(plan)
-                job=output/mode/model
+        for model,mode,modes in worker_schedule(plan):
+            verify_plan(plan)
+            jobs=[output/m/model for m in modes]
+            for job in jobs:
                 job.mkdir(parents=True,exist_ok=True)
-                write(output/'state.json',{'state':'running','active_mode':mode,'active_model':model})
-                command=[sys.executable,'-u',str(Path(plan['root'])/'benchmark.py'),'_worker',str(output),model,mode]
-                print(f'\nStarting {model} / {mode}',flush=True)
-                with (job/'inference.log').open('a') as log:
-                    active=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
-                                             text=True,start_new_session=True,bufsize=1)
-                    for line in active.stdout:
+            write(output/'state.json',{'state':'running','active_mode':mode,'active_model':model})
+            command=[sys.executable,'-u',str(Path(plan['root'])/'benchmark.py'),'_worker',str(output),model,mode]
+            print(f'\nStarting {model} / {mode}',flush=True)
+            with ExitStack() as stack:
+                logs=[stack.enter_context((job/'inference.log').open('a')) for job in jobs]
+                active=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
+                                         text=True,start_new_session=True,bufsize=1)
+                for line in active.stdout:
+                    for log in logs:
                         log.write(line)
                         log.flush()
-                        print(line,end='',flush=True)
-                    code=active.wait()
-                    active=None
-                if code:
-                    failures.append(f'{mode}/{model}')
+                    print(line,end='',flush=True)
+                code=active.wait()
+                active=None
+            if code:
+                failures.append(f'{mode}/{model}')
+            for job in jobs:
+                complete=all((job/f'images/{im["id"]:04d}.json').exists() for im in plan['images'])
+                if code and not complete:
                     saved=read(job/'status.json') if (job/'status.json').exists() else {}
                     write(job/'status.json',{**saved,'state':'failed','exit_code':code})
                     write(job/'failure.json',{'exit_code':code,'log':str(job/'inference.log')})
                 elif (job/'failure.json').exists():
                     (job/'failure.json').unlink()
-                report(output)
+            report(output)
         write(output/'state.json',{'state':'failed' if failures else 'complete','failed_jobs':failures})
         print(f'\nReport: {output / "REPORT.md"}',flush=True)
         return 1 if failures else 0

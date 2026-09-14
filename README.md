@@ -55,6 +55,8 @@ nice -n 10 .venv/bin/python benchmark.py run \
 
 `--samples` counts **images**, not teeth; `0` uses the full selected split. Use `--split dev` for tuning, `--mode auto` or `bbox` for a single task, and a new output directory when changing settings. CPU jobs run sequentially; all-model automatic runs can take many hours.
 
+Embeddings are reused automatically for every box and automatic point batch. With `--mode both`, each model loads once and completes both evaluations for each image using one shared full-image embedding. Additional crops each need one encoding. Reports include encoder/reuse counts and actual inference time; comparison timings include encoding in each mode. No extra flag is needed.
+
 | Family | Sizes / model IDs |
 |---|---|
 | SAM 1 | `sam1_vit_b`, `sam1_vit_l`, `sam1_vit_h` (Base, Large, Huge) |
@@ -97,6 +99,6 @@ nice -n 10 .venv/bin/python benchmark.py resume \
 
 Results include `REPORT.md`, separate `auto/leaderboard.csv` and `bbox/leaderboard.csv`, per-image/tooth scores, predicted masks, timings, and a saved experiment plan. Bbox ranking uses group-macro **Dice**; automatic ranking uses **instance quality** with one-to-one IoU matching, plus COCO mask AP. Reports include bootstrap 95% confidence intervals and exclude incomplete jobs from ranking.
 
-For all options and metric definitions, see [CLI_GUIDE.md](CLI_GUIDE.md) or run `.venv/bin/python benchmark.py run --help`. Test with `.venv/bin/python -m pytest -q test_core.py test_aggregate.py test_benchmark_cli.py`; after installing SAM 3 dependencies, also run `test_sam3.py`.
+For all options and metric definitions, see [CLI_GUIDE.md](CLI_GUIDE.md) or run `.venv/bin/python benchmark.py run --help`. Test with `.venv/bin/python -m pytest -q test_core.py test_aggregate.py test_benchmark_cli.py`; after installing SAM 3 dependencies, also run `test_sam3.py test_embedding_reuse.py`.
 
 Data, checkpoints, environments, and results are downloaded/generated locally and excluded from Git. Model code and weights retain their upstream licenses: [SAM 1](https://github.com/facebookresearch/segment-anything), [SAM 2 / 2.1](https://github.com/facebookresearch/sam2), and [SAM 3](https://huggingface.co/facebook/sam3).
